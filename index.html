@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mölkky VR</title>
+  <meta name="description" content="Jeu de Mölkky en réalité virtuelle (WebXR, A-Frame) — atteindre exactement 50 points.">
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Bibliothèques embarquées (fonctionne hors ligne) -->
+  <script src="lib/aframe.min.js"></script>
+  <script src="lib/cannon-es.min.js"></script>
+
+  <!-- Jeu -->
+  <script src="js/config.js"></script>
+  <script src="js/debug.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/fonts.js"></script>
+  <script src="js/textures.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/pins.js"></script>
+  <script src="js/molkky.js"></script>
+  <script src="js/environment.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/hands.js"></script>
+  <script src="js/desktop.js"></script>
+  <script src="js/assist.js"></script>
+  <script src="js/game.js"></script>
+</head>
+<body>
+  <a-scene
+    renderer="antialias: true; colorManagement: true; logarithmicDepthBuffer: false; foveationLevel: 0.5; highRefreshRate: true"
+    shadow="type: pcf"
+    fog="type: linear; color: #E9D9B2; near: 22; far: 75"
+    background="color: #E9D9B2"
+    xr-mode-ui="enabled: true; XRMode: vr"
+    device-orientation-permission-ui="enabled: false"
+    cursor="rayOrigin: mouse; fuse: false"
+    raycaster="objects: .clickable; far: 20"
+    loading-screen="enabled: false"
+    mk-desktop
+    mk-assist>
+
+    <!-- Décor : pré, allée tondue, arbres, mökki, planche de lancer, tabouret -->
+    <a-entity mk-environment></a-entity>
+
+    <!-- Lumière d'un soir d'été -->
+    <a-entity light="type: hemisphere; color: #FFF1D6; groundColor: #4A6B2A; intensity: 1.25"></a-entity>
+    <a-entity id="soleil" position="3.5 7 0.5"
+      light="type: directional; color: #FFE2B0; intensity: 2.4; castShadow: true;
+             shadowMapWidth: 1024; shadowMapHeight: 1024; shadowBias: -0.0004;
+             shadowCameraLeft: -4.5; shadowCameraRight: 4.5; shadowCameraTop: 4.5; shadowCameraBottom: -4.5;
+             shadowCameraNear: 1; shadowCameraFar: 25; target: #cible-soleil"></a-entity>
+    <a-entity id="cible-soleil" position="0 0 -3"></a-entity>
+
+    <!-- Joueur : caméra et deux manettes (laser pour les boutons, grip pour saisir) -->
+    <a-entity id="rig">
+      <a-entity id="camera" camera="fov: 62; near: 0.03; far: 300" position="0 1.6 0"
+        look-controls="pointerLockEnabled: false; magicWindowTrackingEnabled: false">
+        <!-- panneau de diagnostic (bouton X ou ?debug) -->
+        <a-entity mk-debug position="0 -0.2 -0.65" rotation="-15 0 0"></a-entity>
+      </a-entity>
+      <a-entity id="main-gauche" mk-hand="hand: left"
+        laser-controls="hand: left"
+        raycaster="objects: .clickable; far: 8; lineColor: #F2B544; lineOpacity: 0.85"></a-entity>
+      <a-entity id="main-droite" mk-hand="hand: right"
+        laser-controls="hand: right"
+        raycaster="objects: .clickable; far: 8; lineColor: #F2B544; lineOpacity: 0.85"></a-entity>
+    </a-entity>
+  </a-scene>
+
+  <!-- Surcouche bureau (invisible dans le casque) -->
+  <div id="chargement">
+    <div class="chargement-bloc">
+      <h1>MÖLKKY</h1>
+      <p>On installe les quilles…</p>
+    </div>
+  </div>
+
+  <details id="aide-bureau" class="plaque" open>
+    <summary>Sans casque</summary>
+    <ul>
+      <li><kbd>Glisser</kbd> viser avec la souris</li>
+      <li><kbd>Espace</kbd> maintenir pour doser, relâcher pour lancer</li>
+      <li><kbd>LANCER</kbd> pareil à la souris ou au doigt</li>
+      <li><kbd>Clic</kbd> boutons des panneaux</li>
+      <li><kbd>R</kbd> recommencer la partie</li>
+      <li><kbd>M</kbd> revenir au menu</li>
+    </ul>
+    <button id="exporter" type="button" hidden>&gt; Exporter la partie (.json)</button>
+  </details>
+
+  <p id="avis-xr" class="avis" role="status" hidden></p>
+
+  <button id="lancer" class="lancer" type="button" hidden>Maintenir pour lancer</button>
+
+  <div id="jauge" aria-hidden="true">
+    <span>FORCE</span>
+    <div id="jauge-cadre"><div id="jauge-niveau"></div></div>
+  </div>
+
+  <script>
+    // Surcouche : chargement, aide et export de l'historique de la dernière partie.
+    (function () {
+      var scene = document.querySelector('a-scene');
+      var exportBtn = document.getElementById('exporter');
+      if (window.innerWidth < 900) document.getElementById('aide-bureau').removeAttribute('open');
+      scene.addEventListener('mk-ready', function () {
+        document.getElementById('chargement').classList.add('cache');
+      });
+      scene.addEventListener('mk-state', function (e) {
+        exportBtn.hidden = e.detail.phase !== 'ended';
+      });
+      exportBtn.addEventListener('click', function () {
+        var data = MK.Storage.load();
+        if (!data.last) return;
+        var blob = new Blob([JSON.stringify(data.last, null, 2)], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'molkky-partie-' + data.last.date.slice(0, 19).replace(/[:T]/g, '-') + '.json';
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+      });
+      // Le mode casque exige WebXR, donc une page sécurisée (https:// ou localhost).
+      // Sinon on retire le bouton VR : A-Frame passerait en simple plein écran,
+      // sans manettes, ce qui donne l'impression que « rien ne marche ».
+      function sansVR(msg) {
+        scene.setAttribute('xr-mode-ui', 'enabled', false);
+        var avis = document.getElementById('avis-xr');
+        avis.innerHTML = msg;
+        avis.hidden = false;
+      }
+      if (!window.isSecureContext) {
+        sansVR('<strong>Mode casque indisponible</strong> : la page est ouverte en <code>http://</code> sur une adresse réseau. ' +
+          'Le casque n\'autorise WebXR qu\'en <code>https://</code> (GitHub Pages) ou sur <code>http://localhost</code> ' +
+          '(câble USB + <code>adb reverse</code>). Voir le README.');
+      } else if (!navigator.xr) {
+        sansVR('<strong>Mode écran</strong> : ce navigateur ne gère pas WebXR.');
+      } else {
+        navigator.xr.isSessionSupported('immersive-vr').then(function (ok) {
+          if (!ok) sansVR('<strong>Mode écran</strong> : aucun casque VR détecté.');
+        }, function () { sansVR('<strong>Mode écran</strong> : WebXR refusé par le navigateur.'); });
+      }
+
+      scene.addEventListener('enter-vr', function () { document.body.classList.add('en-vr'); });
+      scene.addEventListener('exit-vr', function () { document.body.classList.remove('en-vr'); });
+    })();
+  </script>
+</body>
+</html>

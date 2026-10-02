@@ -1,0 +1,208 @@
+/* Mölkky VR — surcouche bureau (même palette et mêmes polices que la scène) */
+@font-face {
+  font-family: "Alfa Slab One";
+  src: url("../assets/fonts/AlfaSlabOne-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  src: url("../assets/fonts/BarlowSemiCondensed-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Barlow Semi Condensed";
+  src: url("../assets/fonts/BarlowSemiCondensed-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --koivu: #E8D2A6;
+  --manty: #B9814A;
+  --terva: #2A1E16;
+  --metsa: #2F4A2A;
+  --nurmi: #7FA347;
+  --punamulta: #B5412E;
+  --kulta: #F2B544;
+  --ombre: #120C08;
+  --cadre: rgb(174, 130, 49);   /* kulta à 0,72 de luminosité */
+}
+
+html, body {
+  margin: 0;
+  background: var(--metsa);
+  font-family: "Barlow Semi Condensed", "Arial Narrow", sans-serif;
+}
+
+/* --- écran de chargement ------------------------------------------------ */
+#chargement {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 7vw 12vh;
+  background:
+    repeating-linear-gradient(0deg, rgba(18, 12, 8, 0.35) 0 3px, transparent 3px 140px),
+    var(--metsa);
+  transition: opacity 0.5s ease;
+}
+#chargement.cache { opacity: 0; pointer-events: none; }
+#chargement h1 {
+  margin: 0;
+  font: 400 clamp(56px, 11vw, 140px)/1 "Alfa Slab One", Georgia, serif;
+  color: var(--koivu);
+  text-shadow: 7px 7px 0 var(--ombre);
+}
+#chargement h1::after {
+  content: "";
+  display: block;
+  width: 3.2em;
+  height: 10px;
+  margin-top: 18px;
+  background: var(--kulta);
+  box-shadow: 4px 4px 0 var(--ombre);
+}
+#chargement p {
+  margin: 18px 0 0;
+  font-weight: 700;
+  font-size: 22px;
+  color: var(--koivu);
+  text-shadow: 2px 2px 0 var(--ombre);
+}
+
+/* --- plaque d'aide -------------------------------------------------------- */
+.plaque {
+  position: fixed;
+  right: 16px;
+  top: 16px;
+  z-index: 10;
+  max-width: min(360px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 12px 16px 14px;
+  background: var(--terva);
+  border: 4px solid var(--cadre);
+  box-shadow: 5px 5px 0 var(--ombre);
+  color: var(--koivu);
+}
+.plaque summary {
+  cursor: pointer;
+  list-style: none;
+  margin: 0;
+  font: 400 15px/1.2 "Alfa Slab One", Georgia, serif;
+  letter-spacing: 2px;
+  color: var(--kulta);
+  text-transform: uppercase;
+}
+.plaque summary::-webkit-details-marker { display: none; }
+.plaque summary::before { content: "> "; color: var(--koivu); }
+.plaque[open] summary { margin-bottom: 6px; }
+.plaque ul { margin: 0; padding: 0; list-style: none; }
+.plaque li { font-size: 14px; line-height: 1.55; }
+.plaque kbd {
+  display: inline-block;
+  min-width: 52px;
+  margin-right: 6px;
+  font: 700 13px "Barlow Semi Condensed", sans-serif;
+  color: var(--terva);
+  background: var(--koivu);
+  padding: 0 5px;
+  box-shadow: 2px 2px 0 var(--ombre);
+  text-align: center;
+}
+.plaque button {
+  margin-top: 10px;
+  padding: 6px 10px;
+  font: 700 15px "Barlow Semi Condensed", sans-serif;
+  color: var(--koivu);
+  background: var(--terva);
+  border: 3px solid var(--cadre);
+  box-shadow: 3px 3px 0 var(--ombre);
+  cursor: pointer;
+  text-align: left;
+}
+.plaque button:hover, .plaque button:focus-visible { border-color: var(--kulta); outline: none; }
+
+/* --- jauge de force ------------------------------------------------------- */
+#jauge {
+  position: fixed;
+  left: 50%;
+  bottom: 9vh;
+  z-index: 10;
+  width: min(420px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 12px;
+}
+#jauge.visible { display: flex; }
+#jauge span {
+  font: 400 18px "Alfa Slab One", Georgia, serif;
+  letter-spacing: 2px;
+  color: var(--koivu);
+  text-shadow: 3px 3px 0 var(--ombre);
+}
+#jauge-cadre {
+  flex: 1;
+  height: 22px;
+  background: var(--terva);
+  border: 4px solid var(--kulta);
+  box-shadow: 4px 4px 0 var(--ombre);
+}
+#jauge-niveau {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--nurmi), var(--kulta) 70%, var(--punamulta));
+}
+
+/* --- avis WebXR ----------------------------------------------------------- */
+.avis {
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  z-index: 11;
+  max-width: min(440px, calc(100vw - 32px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--koivu);
+  background: var(--terva);
+  border: 4px solid var(--punamulta);
+  box-shadow: 5px 5px 0 var(--ombre);
+}
+.avis strong { color: var(--kulta); }
+.avis code { font: 700 14px "Barlow Semi Condensed", monospace; color: var(--kulta); }
+
+/* --- bouton de lancer (souris, tactile, navigateur du casque en 2D) -------- */
+.lancer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(9vh + 44px);
+  z-index: 10;
+  transform: translateX(-50%);
+  padding: 14px 26px;
+  font: 400 20px "Alfa Slab One", Georgia, serif;
+  letter-spacing: 1px;
+  color: var(--koivu);
+  background: var(--terva);
+  border: 4px solid var(--cadre);
+  box-shadow: 5px 5px 0 var(--ombre);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.lancer::before { content: "> "; color: var(--cadre); }
+.lancer:hover, .lancer:focus-visible { border-color: var(--kulta); outline: none; }
+.lancer:active { border-color: var(--kulta); }
+.lancer[hidden] { display: none; }
+
+body.en-vr .plaque, body.en-vr #jauge, body.en-vr .lancer, body.en-vr .avis { display: none; }
+
+@media (max-width: 600px) {
+  .plaque li { font-size: 13px; }
+}
