@@ -172,7 +172,9 @@
     while (out.length < count && tries++ < 4000) {
       var a = r() * Math.PI * 2, d = 9 + Math.pow(r(), 0.8) * 38;
       var x = Math.cos(a) * d, z = Math.sin(a) * d;
-      if (Math.abs(x) < 4.5 && z < 4 && z > -12) continue;    // couloir de jeu
+      // aire de jeu dégagée : au moins 6 m entre un tronc et le terrain
+      var ox = Math.max(0, Math.abs(x) - 3.6), oz = Math.max(0, -9.4 - z, z - 1.5);
+      if (ox * ox + oz * oz < 36) continue;
       if (x < -5 && x > -13.5 && z < -11 && z > -19.5) continue; // mökki
       var ok = true;
       for (var i = 0; i < out.length; i++) {
@@ -199,6 +201,7 @@
   function trees() {
     var g = new THREE.Group();
     var all = treeSpots(120, 1234);
+    MK.treeSpots = all;   // les animaux contournent les troncs
     var birches = all.filter(function (_, i) { return i % 3 === 0; });
     var pines = all.filter(function (_, i) { return i % 3 === 1; });
     var spruces = all.filter(function (_, i) { return i % 3 === 2; });
