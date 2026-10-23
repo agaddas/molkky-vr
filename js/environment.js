@@ -175,7 +175,7 @@
       // aire de jeu dégagée : au moins 6 m entre un tronc et le terrain
       var ox = Math.max(0, Math.abs(x) - 3.6), oz = Math.max(0, -9.4 - z, z - 1.5);
       if (ox * ox + oz * oz < 36) continue;
-      if (x < -5 && x > -13.5 && z < -11 && z > -19.5) continue; // mökki
+      if (x < 9 && x > 0 && z < -15.5 && z > -23.5) continue; // mökki
       var ok = true;
       for (var i = 0; i < out.length; i++) {
         var dx = out[i].x - x, dz = out[i].z - z;
@@ -200,7 +200,7 @@
 
   function trees() {
     var g = new THREE.Group();
-    var all = treeSpots(120, 1234);
+    var all = treeSpots(100, 1234);
     MK.treeSpots = all;   // les animaux contournent les troncs
     var birches = all.filter(function (_, i) { return i % 3 === 0; });
     var pines = all.filter(function (_, i) { return i % 3 === 1; });
@@ -276,8 +276,8 @@
       root.add(throwPlank());
       root.add(stool());
       var c = cottage();
-      c.position.set(-9.5, 0, -15.5);
-      c.rotation.y = 0.55;
+      c.position.set(4.5, 0, -19.5);
+      c.rotation.y = -0.15;
       root.add(c);
       root.add(trees());
       root.add(rocks());
