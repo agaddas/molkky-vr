@@ -170,14 +170,14 @@
     var r = MK.Tex.rng(seed), out = [];
     var tries = 0;
     while (out.length < count && tries++ < 4000) {
-      var a = r() * Math.PI * 2, d = 10 + Math.pow(r(), 0.7) * 30;
+      var a = r() * Math.PI * 2, d = 9 + Math.pow(r(), 0.8) * 38;
       var x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (Math.abs(x) < 4.5 && z < 4 && z > -12) continue;    // couloir de jeu
       if (x < -5 && x > -13.5 && z < -11 && z > -19.5) continue; // mökki
       var ok = true;
       for (var i = 0; i < out.length; i++) {
         var dx = out[i].x - x, dz = out[i].z - z;
-        if (dx * dx + dz * dz < 6) { ok = false; break; }
+        if (dx * dx + dz * dz < 5) { ok = false; break; }
       }
       if (ok) out.push({ x: x, z: z, s: 0.75 + r() * 0.6, rot: r() * Math.PI * 2 });
     }
@@ -198,9 +198,10 @@
 
   function trees() {
     var g = new THREE.Group();
-    var all = treeSpots(46, 1234);
-    var birches = all.filter(function (_, i) { return i % 2 === 0; });
-    var pines = all.filter(function (_, i) { return i % 2 === 1; });
+    var all = treeSpots(120, 1234);
+    var birches = all.filter(function (_, i) { return i % 3 === 0; });
+    var pines = all.filter(function (_, i) { return i % 3 === 1; });
+    var spruces = all.filter(function (_, i) { return i % 3 === 2; });
     var up = new THREE.Vector3(0, 1, 0);
 
     // Bouleaux : tronc blanc à marques noires, houppier vert clair
@@ -227,6 +228,18 @@
     [[2.4, 2.2, 2.6], [1.9, 1.9, 4.0], [1.3, 1.6, 5.3]].forEach(function (c) {
       g.add(instanced(new THREE.ConeGeometry(c[0], c[1] * 1.6, 8), needles, pines, function (sp, p, q, s) {
         p.set(sp.x, c[2] * sp.s * 1.25, sp.z); q.setFromAxisAngle(up, sp.rot); s.set(sp.s, sp.s * 1.25, sp.s);
+      }));
+    });
+
+    // Épicéas : silhouette haute et étroite, quatre étages vert bleuté
+    var spruceTrunk = std({ color: '#4A3122' });
+    g.add(instanced(new THREE.CylinderGeometry(0.1, 0.17, 2, 6), spruceTrunk, spruces, function (sp, p, q, s) {
+      p.set(sp.x, 1 * sp.s, sp.z); q.identity(); s.set(sp.s, sp.s, sp.s);
+    }));
+    var spruceNeedles = std({ color: '#243E33', flatShading: true });
+    [[1.7, 2.6, 2.4], [1.4, 2.4, 4.0], [1.05, 2.2, 5.5], [0.65, 2.0, 6.9]].forEach(function (c) {
+      g.add(instanced(new THREE.ConeGeometry(c[0], c[1], 7), spruceNeedles, spruces, function (sp, p, q, s) {
+        p.set(sp.x, c[2] * sp.s * 1.3, sp.z); q.setFromAxisAngle(up, sp.rot + c[2]); s.set(sp.s, sp.s * 1.3, sp.s);
       }));
     });
     return g;
