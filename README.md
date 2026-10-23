@@ -5,7 +5,8 @@ Le jeu de Mölkky en solo, en réalité virtuelle dans le navigateur : on saisit
 
 Technologies : **A-Frame 1.8** (three.js r184) pour la scène WebXR, **cannon-es 0.20** pour la physique. Aucune autre dépendance, aucun fichier audio ni image externe : sons, textures et panneaux sont générés au chargement.
 
-> Équipe : *(à compléter : noms des 4 ou 5 membres)*
+> Équipe : Amine Gaddas - Anthime L’Herminé - Antoine Asham - Nathanaël Lucette
+
 
 ---
 
