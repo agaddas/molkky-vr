@@ -389,7 +389,8 @@
     var L = 56, win = s.result === 'win';
     text(ctx, win ? 'VICTOIRE' : 'DÉFAITE', L, 124, { kind: 'display', size: 104, color: win ? PAL.kulta : PAL.punamulta, shadow: 7 });
     rule(ctx, L, 152, 260, win ? PAL.kulta : PAL.punamulta);
-    text(ctx, win ? '50 points pile en ' + plural(s.throws, 'lancer') + '.' : 'Trois lancers de suite sans point.',
+    var why = s.reason === 'ours' ? 'L\'ours t\'a attrapé. Fallait pas le chatouiller.' : 'Trois lancers de suite sans point.';
+    text(ctx, win ? '50 points pile en ' + plural(s.throws, 'lancer') + '.' : why,
       L, 208, { kind: 'bold', size: 36, color: PAL.koivu });
 
     var stats = [['SCORE FINAL', String(s.score)], ['LANCERS', String(s.throws)], ['TEMPS', R().formatTime(s.timeMs)]];

@@ -498,6 +498,31 @@
       });
     },
 
+    // ---------------------------------------------------------------- l'ours
+    /**
+     * Le mölkky a touché l'ours : il charge le joueur. Le lancer en cours
+     * ne compte plus et plus rien ne peut être saisi. Faux hors partie.
+     */
+    bearAttackStart: function () {
+      if (!this.game || this.game.status !== 'playing') return false;
+      this.cancelTimers();
+      this.releaseHands();
+      this.flight = null;
+      this.phase = 'bear';
+      MK.UI.hint.set(null);
+      this.emitState();
+      return true;
+    },
+
+    /** L'ours a attrapé le joueur : partie perdue. */
+    bearAttackEnd: function () {
+      if (this.phase !== 'bear') return;   // partie relancée entre-temps
+      this.game = MK.Rules.forfeit(this.game, now(), 'ours');
+      MK.UI.toast('PERDU', 'L\'ours t\'a attrapé', PAL.punamulta, 2600);
+      this.refreshScore();
+      this.endGame();
+    },
+
     onImpact: function (body, other, speed) {
       if (this.phase !== 'flying' && this.phase !== 'ended') return;
       var a = body.mkType, b = other.mkType;

@@ -97,6 +97,15 @@
     return { game: next, record: record };
   }
 
+  /**
+   * Défaite immédiate hors lancer (ex. : 'ours', le joueur s'est fait
+   * attraper). Le score et l'historique sont conservés.
+   */
+  function forfeit(game, now, reason) {
+    if (game.status !== 'playing') return game;
+    return Object.assign({}, game, { status: 'ended', result: 'lose', reason: reason || null, endTime: now });
+  }
+
   /** Durée de la partie en ms (en cours ou terminée). */
   function elapsed(game, now) {
     var end = game.endTime != null ? game.endTime : now;
@@ -108,6 +117,7 @@
     return {
       difficulty: game.difficulty,
       result: game.result,
+      reason: game.reason || null,
       score: game.score,
       throws: game.throwCount,
       timeMs: elapsed(game, game.endTime || game.startTime),
@@ -149,6 +159,7 @@
     pointsForThrow: pointsForThrow,
     createGame: createGame,
     applyThrow: applyThrow,
+    forfeit: forfeit,
     elapsed: elapsed,
     summarize: summarize,
     isBetter: isBetter,

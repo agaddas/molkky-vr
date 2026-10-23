@@ -114,9 +114,42 @@
           d[i] = v * Math.min(1, t / 0.02) * (1 - k) * (0.6 + 0.4 * Math.sin(2 * Math.PI * 3 * t));
         }
       });
+      B.growl = buffer(ctx, 1.6, roar(23, 1.6, 55, 25, 0.25));
+      B.roar = buffer(ctx, 2.6, roar(31, 2.6, 85, 70, 0.9));
       return B;
     }
   };
+
+  /**
+   * Rugissement d'ours : voix grave et éraillée (harmoniques d'une
+   * fondamentale qui monte puis retombe, modulée par du bruit), souffle
+   * et saturation. scream (0 à 1) ajoute un cri aigu de film d'horreur.
+   */
+  function roar(seed, dur, f0, lift, scream) {
+    return function (d, sr, n) {
+      var rnd = noise(seed), ph = 0, ph2 = 0, jit = 0, rough = 0, br = 0, hp = 0;
+      for (var i = 0; i < n; i++) {
+        var t = i / sr, k = t / dur;
+        var env = Math.min(1, t / 0.08) * (k < 0.7 ? 1 : Math.max(0, 1 - (k - 0.7) / 0.3));
+        jit += (rnd() * 0.5 - jit) * 0.002;
+        var f = (f0 + lift * Math.sin(Math.PI * Math.min(1, k * 1.3))) * (1 + jit);
+        ph += 2 * Math.PI * f / sr;
+        var v = 0;
+        for (var h = 1; h <= 10; h++) v += Math.sin(ph * h + h * h) / h;
+        rough += (rnd() - rough) * 0.01;            // grain de la voix (~80 Hz)
+        v *= 0.5 + 12 * Math.abs(rough);
+        var x = rnd();
+        br += (x - br) * 0.25;
+        hp = br - hp * 0.6;                           // souffle rauque
+        v += hp * 0.5;
+        if (scream) {
+          ph2 += 2 * Math.PI * (f * 6.5 + 120 * Math.sin(t * 31)) / sr;
+          v += scream * 0.6 * Math.sin(ph2 + 0.8 * Math.sin(ph2 * 1.5)) * Math.min(1, t / 0.2) * (0.6 + Math.abs(rough) * 8);
+        }
+        d[i] = Math.tanh(2.6 * v) * env;
+      }
+    };
+  }
 
   // ------------------------------------------------------------ système
   AFRAME.registerSystem('mk-audio', {

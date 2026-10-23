@@ -4,6 +4,8 @@
  * l'aire de jeu, en évitant les arbres). Un mölkky en vol qui en touche
  * un le met K.O. : il ricoche, l'animal tombe sur le flanc avec des étoiles
  * au-dessus de la tête, puis se relève et s'enfuit.
+ * Sauf l'ours : pendant une partie, il charge le joueur, lui saute au
+ * visage en rugissant, l'écran devient noir et la partie est perdue.
  * Les animaux ne sont pas des corps physiques : la collision avec le
  * mölkky est testée à la main (sphères englobantes), ce qui laisse la
  * simulation des quilles intacte.
@@ -126,7 +128,7 @@
     },
 
     ours: function (model, hits) {
-      var fur = mat('#4A3426'), muzzle = mat('#8A6A4C'), dark = mat('#17110D');
+      var fur = mat('#4A3426'), muzzle = mat('#8A6A4C'), dark = mat('#17110D'), eye = mat('#17110D');
       part(model, null, fur, 0, 0.72, -0.05, 0.48, 0.48, 0.82);
       part(model, null, fur, 0, 0.92, 0.25, 0.42, 0.38, 0.4);  // bosse des épaules
       part(model, null, fur, 0, 0.68, -0.85, 0.08, 0.08, 0.06);
@@ -139,10 +141,21 @@
       part(head, null, fur, 0, 0, 0, 0.26, 0.24, 0.26);
       part(head, null, muzzle, 0, -0.06, 0.24, 0.12, 0.1, 0.14);
       part(head, null, dark, 0, -0.02, 0.37, 0.05, 0.035, 0.03);
-      part(head, null, dark, -0.11, 0.07, 0.2, 0.028, 0.028, 0.028);
-      part(head, null, dark, 0.11, 0.07, 0.2, 0.028, 0.028, 0.028);
+      part(head, null, eye, -0.11, 0.07, 0.2, 0.028, 0.028, 0.028);
+      part(head, null, eye, 0.11, 0.07, 0.2, 0.028, 0.028, 0.028);
       part(head, null, fur, -0.18, 0.2, -0.02, 0.07, 0.07, 0.04);
       part(head, null, fur, 0.18, 0.2, -0.02, 0.07, 0.07, 0.04);
+      // gueule ouverte, visible seulement quand il attaque
+      var mouth = new THREE.Group();
+      mouth.position.set(0, -0.17, 0.3);
+      mouth.visible = false;
+      head.add(mouth);
+      part(mouth, null, mat('#5A0E0E'), 0, 0, 0, 0.13, 0.1, 0.09);
+      var fang = new THREE.ConeGeometry(0.02, 0.08, 5), white = mat('#F1EAD8');
+      [-1, 1].forEach(function (s) {
+        part(mouth, fang, white, s * 0.07, 0.06, 0.06).rotation.x = Math.PI;
+        part(mouth, fang, white, s * 0.05, -0.06, 0.06);
+      });
       var legs = [[-0.28, 0.42], [0.28, 0.42], [-0.28, -0.5], [0.28, -0.5]].map(function (c) {
         return leg(model, c[0], 0.55, c[1], 0.13, 0.58, fur, dark);
       });
@@ -150,7 +163,7 @@
       marker(hits, model, 0, 0.8, 0.2, 0.55);
       marker(hits, model, 0, 0.3, 0, 0.35);
       marker(hits, head, 0, 0, 0.08, 0.32);
-      return { neck: neck, head: head, legs: legs };
+      return { neck: neck, head: head, legs: legs, mouth: mouth, eye: eye };
     }
   };
 
@@ -267,7 +280,7 @@
       var c = new THREE.Vector3(), q = new THREE.Vector3(), w = new THREE.Vector3();
       for (var i = 0; i < this.animals.length; i++) {
         var an = this.animals[i];
-        if (an.state === 'ko' || an.state === 'getup') continue;
+        if (an.state !== 'idle' && an.state !== 'walk') continue;
         var gp = an.group.position;
         if ((gp.x - cur.x) * (gp.x - cur.x) + (gp.z - cur.z) * (gp.z - cur.z) > 9) continue;
         an.group.updateMatrixWorld(true);
@@ -279,7 +292,9 @@
             var t = THREE.MathUtils.clamp(axis.dot(q.subVectors(w, c)), -M.length / 2, M.length / 2);
             q.copy(c).addScaledVector(axis, t);
             if (q.distanceToSquared(w) < r * r) {
-              this.knockOut(an, mk, q, w);
+              this.bounce(mk, q, w);
+              if (an.kind === 'ours' && this.bearAttack(an)) { /* il charge */ }
+              else this.knockOut(an, mk, q);
               this.prevMolkky.copy(cur);
               return;
             }
@@ -289,9 +304,9 @@
       this.prevMolkky.copy(cur);
     },
 
-    knockOut: function (an, mk, contact, center) {
+    /** Ricochet du mölkky sur l'animal (rebond amorti). */
+    bounce: function (mk, contact, center) {
       var v = mk.body.velocity;
-      // ricochet du mölkky sur l'animal (rebond amorti)
       var n = new THREE.Vector3().subVectors(contact, center);
       if (n.lengthSq() < 1e-6) n.set(-v.x, 0, -v.z);
       n.normalize();
@@ -301,9 +316,13 @@
       }
       v.scale(0.55, v);
       mk.body.wakeUp();
-      // l'animal tombe du côté où on l'a frappé
+    },
+
+    knockOut: function (an, mk, contact) {
+      var v = mk.body.velocity;
+      // l'animal tombe du côté où on l'a frappé (le mölkky a déjà rebondi : sens inverse)
       var h = an.heading, rightX = Math.cos(h), rightZ = -Math.sin(h);
-      an.rollSign = (v.x * rightX + v.z * rightZ) > 0 ? 1 : -1;
+      an.rollSign = (v.x * rightX + v.z * rightZ) > 0 ? -1 : 1;
       an.state = 'ko';
       an.koAt = performance.now();
       an.timer = 0;
@@ -317,10 +336,168 @@
       MK.Debug.set('animal', an.kind + ' K.O.');
     },
 
+    // ---------------------------------------------------------------- l'ours attaque
+    /** L'ours touché charge le joueur (seulement pendant une partie). */
+    bearAttack: function (an) {
+      var game = MK.game;
+      if (!game || !game.bearAttackStart || !game.bearAttackStart()) return false;
+      an.state = 'charge';
+      an.attackT = 0;
+      an.growls = 0;
+      an.rig.eye.emissive.set('#FF2A00');
+      an.rig.eye.emissiveIntensity = 1.5;
+      if (game.audio) game.audio.play('growl', an.group.position, 1, 0.95);
+      MK.Debug.set('animal', 'ours : charge');
+      return true;
+    },
+
+    cameraPos: function (out) {
+      var cam = this.el.sceneEl.camera;
+      if (cam) cam.getWorldPosition(out); else out.set(0, 1.6, 0);
+      return out;
+    },
+
+    /** Sans casque, la vue se tourne vers l'ours pour ne rien rater. */
+    lookAt: function (p, dt) {
+      if (!MK.game || MK.game.isVR()) return;
+      var lcEl = document.querySelector('[look-controls]');
+      var lc = lcEl && lcEl.components['look-controls'];
+      if (!lc) return;
+      var c = this.cameraPos(new THREE.Vector3());
+      var yaw = Math.atan2(-(p.x - c.x), -(p.z - c.z));
+      var pitch = THREE.MathUtils.clamp(Math.atan2(p.y - c.y, Math.hypot(p.x - c.x, p.z - c.z)), -0.3, 0.15);
+      var k = Math.min(1, dt * 5);
+      lc.yawObject.rotation.y += wrapAngle(yaw - lc.yawObject.rotation.y) * k;
+      lc.pitchObject.rotation.x += (pitch - lc.pitchObject.rotation.x) * k;
+    },
+
+    updateAttack: function (an, dt, t) {
+      var g = an.group, rig = an.rig, game = MK.game;
+      if (an.state !== 'scare' && (!game || game.phase !== 'bear')) { this.resetBear(an); return; }  // partie relancée
+      var cp = this.cameraPos(new THREE.Vector3());
+      an.attackT += dt;
+
+      if (an.state === 'charge') {
+        var dx = cp.x - g.position.x, dz = cp.z - g.position.z, dist = Math.hypot(dx, dz);
+        var dh = wrapAngle(Math.atan2(dx, dz) - an.heading), turn = 7 * dt;
+        an.heading += Math.max(-turn, Math.min(turn, dh));
+        var speed = Math.min(8.5, 2 + an.attackT * 7) * Math.max(0.3, Math.cos(dh));
+        g.position.x += Math.sin(an.heading) * speed * dt;
+        g.position.z += Math.cos(an.heading) * speed * dt;
+        g.rotation.y = an.heading;
+        // galop : pattes avant ensemble, arrière ensemble
+        an.phase += dt * 15;
+        rig.legs.forEach(function (l, i) { l.rotation.x = Math.sin(an.phase + (i < 2 ? 0 : Math.PI)) * 0.9; });
+        g.position.y = Math.abs(Math.sin(an.phase)) * 0.14;
+        an.roll.rotation.x = Math.sin(an.phase) * 0.1;
+        rig.neck.rotation.x += (0.3 - rig.neck.rotation.x) * Math.min(1, dt * 6);
+        if (an.attackT > 1.3 * (an.growls + 1) && game && game.audio) {
+          an.growls++;
+          game.audio.play('growl', g.position, 1, 0.85 + Math.random() * 0.2);
+        }
+        this.lookAt(new THREE.Vector3(g.position.x, 1.1, g.position.z), dt);
+        if (dist < 2.8 || an.attackT > 7) {
+          // bond : la tête finit juste devant les yeux du joueur
+          var dir = new THREE.Vector3(dx, 0, dz).normalize();
+          an.state = 'leap';
+          an.attackT = 0;
+          an.leapFrom = g.position.clone();
+          an.leapTo = new THREE.Vector3(cp.x - dir.x * 1.6, Math.max(0, cp.y - 1.35), cp.z - dir.z * 1.6);
+          an.heading = Math.atan2(dir.x, dir.z);
+          if (game && game.audio) game.audio.play('roar', new THREE.Vector3().lerpVectors(cp, an.leapTo, 0.5).setY(cp.y), 1);
+        }
+        return;
+      }
+
+      if (an.state === 'leap') {
+        var k = Math.min(1, an.attackT / 0.45), e = 1 - Math.pow(1 - k, 3);
+        g.position.lerpVectors(an.leapFrom, an.leapTo, e);
+        g.position.y += Math.sin(Math.PI * k) * 0.5;
+        g.rotation.y = an.heading;
+        an.roll.rotation.x = -0.6 * e;                 // il se cabre…
+        g.scale.setScalar(an.spec.s * (1 + 0.15 * e));
+        rig.mouth.visible = k > 0.25;
+        rig.neck.rotation.x = 0.3 + 0.35 * e;          // …la gueule face au joueur
+        rig.legs.forEach(function (l, i) { l.rotation.x = i < 2 ? -1.3 * e : 0.5 * e; });
+        rig.head.getWorldPosition(this.tmpHead || (this.tmpHead = new THREE.Vector3()));
+        this.tmpHead.y -= 0.2;
+        this.lookAt(this.tmpHead, dt * 3);
+        if (k >= 1) { an.state = 'scare'; an.attackT = 0; this.scare = { t: 0, bear: an, ended: false }; }
+        return;
+      }
+
+      // scare : il reste dans la figure en tremblant, l'écran va virer au noir
+      g.position.copy(an.leapTo);
+      g.position.x += (Math.random() - 0.5) * 0.05;
+      g.position.y += (Math.random() - 0.5) * 0.05;
+      rig.head.rotation.z = Math.sin(t / 25) * 0.15;
+    },
+
+    resetBear: function (an) {
+      var rig = an.rig;
+      an.state = 'idle';
+      an.timer = rand(2, 5);
+      an.rush = 1;
+      an.roll.rotation.set(0, 0, 0);
+      an.roll.position.y = an.sp.h;
+      an.group.scale.setScalar(an.spec.s);
+      rig.mouth.visible = false;
+      rig.head.rotation.set(0, 0, 0);
+      rig.neck.rotation.x = 0;
+      rig.legs.forEach(function (l) { l.rotation.x = 0; });
+      rig.eye.emissive.set('#000000');
+      rig.eye.emissiveIntensity = 0;
+      var p = this.pickSpot(an, null);
+      an.group.position.set(p.x, 0, p.z);
+    },
+
+    /** Voile rouge puis noir devant les yeux, puis « PERDU ». */
+    updateScare: function (dt) {
+      var s = this.scare;
+      if (!s) return;
+      if (!this.veil) {
+        this.veil = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({
+          color: '#000000', transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false, toneMapped: false
+        }));
+        this.veil.position.z = -0.1;
+        this.veil.renderOrder = 9999;
+        this.veil.frustumCulled = false;
+      }
+      var cam = this.el.sceneEl.camera;
+      if (cam && this.veil.parent !== cam) cam.add(this.veil);
+      s.t += dt;
+      var m = this.veil.material;
+      this.veil.visible = true;
+      if (s.t < 0.35) {
+        m.color.set('#7A0000');
+        m.opacity = 0.9 * s.t / 0.35;
+      } else {
+        m.color.set('#000000');
+        if (s.bear) {
+          this.resetBear(s.bear);
+          s.bear = null;
+          // sans casque : la vue revient sur le terrain, face aux panneaux
+          var lcEl = document.querySelector('[look-controls]'), lc = lcEl && lcEl.components['look-controls'];
+          if (lc && MK.game && !MK.game.isVR()) { lc.yawObject.rotation.y = 0; lc.pitchObject.rotation.x = -0.09; }
+        }
+        if (s.t > 1.1 && !s.ended) {
+          s.ended = true;
+          if (MK.game && MK.game.bearAttackEnd) MK.game.bearAttackEnd();
+        }
+        m.opacity = s.t < 1.1 ? 1 : Math.max(0, 1 - (s.t - 1.1) / 0.7);
+        if (m.opacity <= 0) { this.veil.visible = false; this.scare = null; }
+      }
+    },
+
     // ---------------------------------------------------------------- animation
     updateAnimal: function (an, dt, t) {
       var sp = an.sp, g = an.group, rig = an.rig;
       var moving = false;
+
+      if (an.state === 'charge' || an.state === 'leap' || an.state === 'scare') {
+        this.updateAttack(an, dt, t);
+        return;
+      }
 
       if (an.state === 'ko' || an.state === 'getup') {
         var el = (performance.now() - an.koAt) / 1000, k;
@@ -411,6 +588,7 @@
         var s = Math.min(dt / 1000, 0.1);
         self.checkHits();
         for (var i = 0; i < self.animals.length; i++) self.updateAnimal(self.animals[i], s, t);
+        self.updateScare(s);
       });
     }
   });

@@ -117,6 +117,17 @@ test('stockage corrompu : on repart de zéro sans planter', () => {
   assert.strictEqual(s.getBest('normal'), null);
 });
 
+console.log('Attaque de l\'ours');
+test('l\'ours termine la partie en défaite, score gardé', () => {
+  const g = R.forfeit(play([[7], [3, 4]]), 5000, 'ours');
+  assert.deepStrictEqual([g.status, g.result, g.reason, g.score, g.endTime], ['ended', 'lose', 'ours', 9, 5000]);
+  assert.strictEqual(R.summarize(g).reason, 'ours');
+});
+test('partie déjà finie : l\'ours ne change rien', () => {
+  const g = play([[12], [12], [12], [12], [2]]);
+  assert.strictEqual(R.forfeit(g, 9000, 'ours'), g);
+});
+
 console.log('Formatage');
 test('mm:ss', () => { assert.strictEqual(R.formatTime(0), '00:00'); assert.strictEqual(R.formatTime(125400), '02:05'); });
 
