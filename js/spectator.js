@@ -9,7 +9,11 @@
  * - Caméra lissée, pour que les petits mouvements de tête ne donnent pas le
  *   mal de mer aux spectateurs.
  * - Inutile et coûteux dans le navigateur autonome du casque : désactivé
- *   là-bas, ainsi qu'avec ?miroir=0 dans l'adresse.
+ *   là-bas, ainsi qu'avec ?miroir=0 dans l'adresse ; bouton A pour le
+ *   couper ou le rétablir pendant la partie.
+ * - Attention : en VR, three.js redirige « dessiner sur la page » vers
+ *   l'image du casque ; le drapeau xr.isPresenting est levé le temps du
+ *   dessin, sinon la vue du PC s'affiche en double dans les yeux.
  * ========================================================================= */
 (function () {
   'use strict';
@@ -41,7 +45,13 @@
 
       var self = this;
       this.el.addEventListener('enter-vr', function () { self.first = true; });
-      MK.Debug.set('miroir PC', this.enabled ? 'actif pendant la VR' : 'désactivé (casque autonome)');
+      // Bouton A (manette droite) : couper / rétablir la retransmission
+      this.el.addEventListener('abuttondown', function () {
+        self.enabled = !self.enabled;
+        self.first = true;
+        MK.Debug.set('miroir PC', self.enabled ? 'actif (A pour couper)' : 'coupé (A pour rétablir)');
+      });
+      MK.Debug.set('miroir PC', this.enabled ? 'actif (A pour couper)' : 'désactivé (casque autonome)');
     },
 
     /** Faut-il dessiner ? Seulement si l'image du casque ne passe pas déjà par la page. */
@@ -96,15 +106,24 @@
 
       var xrTarget = r.getRenderTarget();
       var shadowAuto = r.shadowMap.autoUpdate;
+      var presenting = r.xr.isPresenting;
       r.xr.enabled = false;               // rendu « normal », hors casque
       r.shadowMap.autoUpdate = false;     // les ombres de cette image sont déjà calculées
       try {
         r.setRenderTarget(this.rt);
         r.clear();
         r.render(this.el.object3D, cam);
-        r.setRenderTarget(null);          // la page
+        // Pendant une session VR, three.js redirige setRenderTarget(null) vers
+        // l'image du casque : on lève ce drapeau le temps de dessiner la page.
+        r.xr.isPresenting = false;
+        r.setRenderTarget(null);
+        if (r.getRenderTarget() !== null) throw new Error('rendu redirigé vers le casque, miroir coupé');
         r.render(this.quadScene, this.quadCam);
+      } catch (e) {
+        this.enabled = false;             // ne jamais risquer de gâcher l'image du casque
+        throw e;
       } finally {
+        r.xr.isPresenting = presenting;
         r.setRenderTarget(xrTarget);
         r.shadowMap.autoUpdate = shadowAuto;
         r.xr.enabled = true;

@@ -55,7 +55,7 @@ Le mode bureau (souris, Espace, bouton LANCER) n'existe que pour tester et faire
 
 ## Montrer au public ce que voit le joueur
 
-- **Casque branché au PC (Quest Link ou Air Link), jeu ouvert dans Chrome ou Edge sur le PC** : pendant la VR, la page du PC affiche automatiquement la vue du joueur (composant `mk-spectator`, `js/spectator.js`). Elle est rendue en 1280 px au plus et légèrement lissée pour ne pas donner le mal de mer au public. On peut la couper avec `?miroir=0` dans l'adresse.
+- **Casque branché au PC (Quest Link ou Air Link), jeu ouvert dans Chrome ou Edge sur le PC** : pendant la VR, la page du PC affiche automatiquement la vue du joueur (composant `mk-spectator`, `js/spectator.js`). Elle est rendue en 1280 px au plus et légèrement lissée pour ne pas donner le mal de mer au public. On peut la couper avec `?miroir=0` dans l'adresse, ou pendant la partie avec le bouton **A** de la manette droite.
 - **Jeu ouvert directement dans le navigateur du casque (sans PC)** : la page du PC est une autre copie du jeu et ne peut rien montrer. Il faut utiliser la diffusion du Quest : bouton « Diffuser » du casque vers l'appli Meta Horizon du téléphone, ou vers la page de diffusion Meta ouverte dans Chrome sur le PC.
 
 ## Dépannage dans le casque
