@@ -108,9 +108,10 @@
     ctx.fillRect(x, y, w, 8);
   }
 
-  function difficultyLine(id) {
+  function difficultyLine(id, terrain) {
     var d = MK.CONFIG.difficulties[id];
-    return d.label.toUpperCase() + '  ·  ' + String(d.distance).replace('.', ',') + ' m';
+    var t = MK.CONFIG.terrains[terrain];
+    return d.label.toUpperCase() + '  ·  ' + String(d.distance).replace('.', ',') + ' m' + (t ? '  ·  ' + t.label.toUpperCase() : '');
   }
 
   function plural(n, word) { return n + ' ' + word + (n > 1 ? 's' : ''); }
@@ -305,23 +306,24 @@
     text(ctx, 'Fais tomber les quilles. Atteins 50 points,', L, 222, { kind: 'bold', size: 34, color: PAL.koivu });
     text(ctx, 'pas un de plus.', L, 262, { kind: 'bold', size: 34, color: PAL.koivu });
     text(ctx, 'DIFFICULTÉ', L, 322, { kind: 'bold', size: 26, color: PAL.kulta, spacing: 4 });
+    text(ctx, 'TERRAIN', L, 616, { kind: 'bold', size: 26, color: PAL.kulta, spacing: 4 });
 
     var best = s.best;
     var line;
     if (!best) line = 'Pas encore de record en ' + MK.CONFIG.difficulties[s.difficulty].label.toLowerCase() + '.';
     else if (best.result === 'win') line = 'Record : 50 pile en ' + plural(best.throws, 'lancer') + ', ' + R().formatTime(best.timeMs);
     else line = 'Record : ' + best.score + ' points avant la défaite (' + plural(best.throws, 'lancer') + ')';
-    text(ctx, line, L, 730, { kind: 'bold', size: 30, color: PAL.koivu });
+    text(ctx, line, L, 872, { kind: 'bold', size: 30, color: PAL.koivu });
     text(ctx, s.vr ? 'Laser + gâchette : boutons   ·   Grip : saisir et lancer'
                     : 'Souris : boutons   ·   Espace maintenu : doser et lancer',
-      L, 772, { kind: 'body', size: 24, color: scaleColor(PAL.koivu, 0.75), shadow: 2 });
+      L, 914, { kind: 'body', size: 24, color: scaleColor(PAL.koivu, 0.75), shadow: 2 });
   }
 
   function drawScore(ctx, W, H, s) {
     paintedPlanks(ctx, W, H, 23);
     var L = 52;
     text(ctx, 'SCORE', L, 78, { kind: 'bold', size: 34, color: PAL.kulta, spacing: 5 });
-    text(ctx, difficultyLine(s.difficulty || 'normal'), W - L, 78, { kind: 'bold', size: 32, color: PAL.koivu, align: 'right', spacing: 2 });
+    text(ctx, difficultyLine(s.difficulty || 'normal', s.terrain), W - L, 78, { kind: 'bold', size: 32, color: PAL.koivu, align: 'right', spacing: 2 });
     rule(ctx, L, 100, W - 2 * L, 'rgba(232,210,166,0.35)');
 
     var score = s.score || 0;
@@ -542,14 +544,20 @@
       this.scene = scene;
 
       // Menu principal
-      this.menu = new Board(scene, { w: 0.95, h: 1.0, position: '-0.72 1.32 -1.7', rotationY: 22, draw: drawMenu });
+      this.menu = new Board(scene, { w: 0.95, h: 1.2, position: '-0.72 1.4 -1.7', rotationY: 22, draw: drawMenu });
       var self = this;
       this.choiceButtons = ['facile', 'normal', 'difficile'].map(function (id, i) {
         return self.menu.addButton(56, 340 + i * 80, 648, 70, {
           label: D[id].label, detail: D[id].detail, kind: 'choice', action: 'difficulty', value: id
         });
       });
-      this.menu.addButton(56, 592, 648, 88, { label: 'NOUVELLE PARTIE', kind: 'primary', action: 'start' });
+      var T = MK.CONFIG.terrains;
+      this.terrainButtons = ['herbe', 'sable', 'beton'].map(function (id, i) {
+        return self.menu.addButton(56 + i * 220, 634, 208, 70, {
+          label: T[id].label, kind: 'choice', action: 'terrain', value: id
+        });
+      });
+      this.menu.addButton(56, 728, 648, 88, { label: 'NOUVELLE PARTIE', kind: 'primary', action: 'start' });
 
       // Tableau des scores (+ zone chrono rafraîchie chaque seconde)
       this.score = new Board(scene, { w: 1.25, h: 0.95, position: '-1.3 1.42 -2.35', rotationY: 29, draw: drawScore });
@@ -584,11 +592,14 @@
       this.controls.setVisible(name === 'game');
     },
 
-    showMenu: function (difficulty, best, vr) {
+    showMenu: function (difficulty, terrain, best, vr) {
       this.choiceButtons.forEach(function (b) {
         b.setAttribute('mk-button', 'selected', b.getAttribute('mk-button').value === difficulty);
       });
-      this.menu.redraw({ difficulty: difficulty, best: best, vr: vr });
+      this.terrainButtons.forEach(function (b) {
+        b.setAttribute('mk-button', 'selected', b.getAttribute('mk-button').value === terrain);
+      });
+      this.menu.redraw({ difficulty: difficulty, terrain: terrain, best: best, vr: vr });
       this.setScreen('menu');
     },
 

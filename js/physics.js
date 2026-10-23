@@ -27,16 +27,18 @@
       world.solver.iterations = 18;
       this.world = world;
 
-      // Matériaux : herbe / bois
-      var ground = new CANNON.Material('herbe');
+      // Matériaux : sol / bois (le contact sol-bois dépend du terrain, voir setTerrain)
+      var ground = new CANNON.Material('sol');
       var wood = new CANNON.Material('bois');
       this.materials = { ground: ground, wood: wood };
-      world.addContactMaterial(new CANNON.ContactMaterial(ground, wood, {
+      this.groundContact = new CANNON.ContactMaterial(ground, wood, {
         friction: 0.55,
         restitution: 0.14,
         contactEquationStiffness: 5e6,
         contactEquationRelaxation: 3
-      }));
+      });
+      world.addContactMaterial(this.groundContact);
+      this.terrain = MK.CONFIG.terrains[MK.CONFIG.defaultTerrain];
       world.addContactMaterial(new CANNON.ContactMaterial(wood, wood, {
         friction: 0.32,
         restitution: 0.38,
@@ -58,6 +60,8 @@
       var self = this;
       this.links.push({ body: body, object3D: object3D });
       body.mkInWorld = false;
+      body.mkBaseAngularDamping = body.angularDamping;
+      body.angularDamping = Math.min(0.97, body.mkBaseAngularDamping * this.terrain.rolling);
       body.mkLastImpact = 0;
       body.addEventListener('collide', function (e) {
         var now = performance.now();
@@ -69,6 +73,17 @@
           self.impactListeners[i](body, e.body, speed);
         }
       });
+    },
+
+    /** Change le terrain : rebond et frottement au sol, roulement des corps liés. */
+    setTerrain: function (terrain) {
+      this.terrain = terrain;
+      this.groundContact.friction = terrain.friction;
+      this.groundContact.restitution = terrain.restitution;
+      for (var i = 0; i < this.links.length; i++) {
+        var b = this.links[i].body;
+        b.angularDamping = Math.min(0.97, b.mkBaseAngularDamping * terrain.rolling);
+      }
     },
 
     onImpact: function (fn) { this.impactListeners.push(fn); },
@@ -111,6 +126,30 @@
       return true;
     },
 
+    /**
+     * Freine les corps qui touchent le sol, en translation comme en rotation :
+     * tous sur terrain meuble (sable), seulement les presque immobiles sur sol
+     * dur (béton). Sans effet en vol : la trajectoire prédite par l'aide reste juste.
+     */
+    applyGroundDrag: function (h) {
+      var t = this.terrain;
+      var contacts = this.world.contacts, ground = this.groundBody;
+      this.dragStamp = (this.dragStamp || 0) + 1;
+      for (var i = 0; i < contacts.length; i++) {
+        var c = contacts[i];
+        var b = c.bi === ground ? c.bj : (c.bj === ground ? c.bi : null);
+        if (!b || b.mass === 0 || b.mkDragStamp === this.dragStamp) continue;
+        b.mkDragStamp = this.dragStamp;
+        var drag = t.groundDrag;
+        if (t.settleDrag && b.velocity.length() < 0.25 && b.angularVelocity.length() < 3) drag += t.settleDrag;
+        if (!drag) continue;
+        var k = Math.max(0, 1 - drag * h);
+        b.velocity.x *= k;
+        b.velocity.z *= k;
+        b.angularVelocity.scale(k, b.angularVelocity);
+      }
+    },
+
     /** Avance la simulation d'un temps donné (utilisé aussi par les tests). */
     advance: function (seconds) {
       var h = this.cfg.step;
@@ -118,6 +157,7 @@
       var n = 0;
       while (this.acc >= h && n < this.cfg.maxSubSteps) {
         this.world.step(h);
+        if (this.terrain.groundDrag || this.terrain.settleDrag) this.applyGroundDrag(h);
         this.acc -= h;
         this.simTime += h;
         n++;

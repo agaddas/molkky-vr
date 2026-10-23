@@ -2,6 +2,8 @@
  * Mölkky VR — décor
  * Pré d'été finlandais : herbe, allée tondue, bouleaux et pins, mökki
  * rouge, planche de lancer et tabouret où attend le mölkky.
+ * Le terrain de jeu change selon le choix du menu : allée tondue, carré de
+ * sable ou dalle de béton (MK.showTerrain).
  * Les arbres sont instanciés (quelques appels de rendu seulement) pour
  * rester fluide sur un casque autonome.
  * ========================================================================= */
@@ -61,6 +63,35 @@
     m.receiveShadow = true;
     return m;
   }
+
+  // Terrain de sable / béton : couvre la zone où les quilles peuvent finir.
+  var COURT_W = 7.2, COURT_L = 10.6, COURT_Z = -4.1, COURT_PPM = 142;
+
+  /** Surfaces dessinées seulement au premier choix du terrain (grandes textures). */
+  var courtBuilders = {
+    sable: function () {
+      var tex = MK.Tex.sandCourt(Math.round(COURT_W * COURT_PPM), Math.round(COURT_L * COURT_PPM));
+      var m = new THREE.Mesh(new THREE.PlaneGeometry(COURT_W + 0.8, COURT_L + 0.8), std({
+        map: tex, transparent: true, roughness: 1, polygonOffset: true, polygonOffsetFactor: -1, depthWrite: false
+      }));
+      m.rotation.x = -Math.PI / 2;
+      m.position.set(0, 0.002, COURT_Z);
+      m.receiveShadow = true;
+      return m;
+    },
+    beton: function () {
+      var tex = MK.Tex.concreteCourt(Math.round(COURT_W * COURT_PPM), Math.round(COURT_L * COURT_PPM), 1.8 * COURT_PPM);
+      // dalle à peine plus haute que l'herbe : bord net
+      var m = new THREE.Mesh(new THREE.BoxGeometry(COURT_W, 0.04, COURT_L), [
+        std({ color: '#8E8B84' }), std({ color: '#8E8B84' }),
+        std({ map: tex, roughness: 0.85 }), std({ color: '#8E8B84' }),
+        std({ color: '#8E8B84' }), std({ color: '#8E8B84' })
+      ]);
+      m.position.set(0, -0.016, COURT_Z);
+      m.receiveShadow = true;
+      return m;
+    }
+  };
 
   function throwPlank() {
     var g = new THREE.Group();
@@ -224,7 +255,8 @@
       var root = new THREE.Group();
       root.add(sky());
       root.add(ground());
-      root.add(mowedStrip(8.6, -3.6));
+      var strip = mowedStrip(8.6, -3.6);
+      root.add(strip);
       root.add(throwPlank());
       root.add(stool());
       var c = cottage();
@@ -234,6 +266,17 @@
       root.add(trees());
       root.add(rocks());
       this.el.setObject3D('env', root);
+
+      // Affiche le terrain choisi (herbe : allée tondue ; sinon sable ou béton).
+      var courts = {};
+      MK.showTerrain = function (id) {
+        if (id !== 'herbe' && !courts[id] && courtBuilders[id]) {
+          courts[id] = courtBuilders[id]();
+          root.add(courts[id]);
+        }
+        strip.visible = id === 'herbe';
+        Object.keys(courts).forEach(function (k) { courts[k].visible = k === id; });
+      };
     }
   });
 })();

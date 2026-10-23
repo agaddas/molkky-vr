@@ -151,6 +151,121 @@
       return cache.birch;
     },
 
+    /**
+     * Terrain de sable : grains clairs et sombres, quelques traces de râteau,
+     * bords fondus dans l'herbe (masque alpha irrégulier).
+     */
+    sandCourt: function (w, h) {
+      if (cache.sand) return cache.sand;
+      var c = canvas(w, h), ctx = c.getContext('2d');
+      var r = rng(53);
+      ctx.fillStyle = '#D6BC89';
+      ctx.fillRect(0, 0, w, h);
+      // taches de sable plus ou moins tassé
+      for (var i = 0; i < 70; i++) {
+        ctx.globalAlpha = 0.06 + r() * 0.08;
+        ctx.fillStyle = r() > 0.5 ? '#B89B68' : '#EAD6AA';
+        ctx.beginPath();
+        ctx.ellipse(r() * w, r() * h, 20 + r() * 90, 12 + r() * 60, r() * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // traces de râteau, légèrement ondulées
+      ctx.strokeStyle = '#A88B5B';
+      for (var j = 0; j < 9; j++) {
+        var y0 = r() * h, amp = 4 + r() * 10, len = 0.3 + r() * 0.5, x0 = r() * w * (1 - len);
+        ctx.globalAlpha = 0.12 + r() * 0.1;
+        for (var t = 0; t < 4; t++) {
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          for (var x = x0; x <= x0 + len * w; x += 8) {
+            var yy = y0 + t * 7 + Math.sin(x * 0.012 + j) * amp;
+            if (x === x0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+          }
+          ctx.stroke();
+        }
+      }
+      // grains
+      var tones = ['#F2E2BE', '#C2A574', '#9E8256', '#E3CC9C', '#7E6748'];
+      for (var k = 0; k < 60000; k++) {
+        ctx.globalAlpha = 0.25 + r() * 0.5;
+        ctx.fillStyle = tones[(r() * tones.length) | 0];
+        ctx.fillRect(r() * w, r() * h, 1 + r() * 1.6, 1 + r() * 1.6);
+      }
+      ctx.globalAlpha = 1;
+      // bords fondus (largeur variable pour un contour naturel)
+      ctx.globalCompositeOperation = 'destination-in';
+      var mask = canvas(w, h), m = mask.getContext('2d');
+      m.fillStyle = '#000';
+      m.filter = 'blur(' + Math.round(w * 0.025) + 'px)';
+      m.beginPath();
+      var n = 48, cx = w / 2, cy = h / 2;
+      for (var a = 0; a <= n; a++) {
+        var ang = a / n * Math.PI * 2;
+        var ux = Math.cos(ang), uy = Math.sin(ang);
+        // rectangle aux coins arrondis, rayon un peu bruité
+        var sx = Math.pow(Math.abs(ux), 0.25) * Math.sign(ux), sy = Math.pow(Math.abs(uy), 0.25) * Math.sign(uy);
+        var k2 = 0.9 + r() * 0.05;
+        var px = cx + sx * cx * k2, py = cy + sy * cy * k2;
+        if (a === 0) m.moveTo(px, py); else m.lineTo(px, py);
+      }
+      m.closePath();
+      m.fill();
+      ctx.drawImage(mask, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+      cache.sand = toTexture(c);
+      return cache.sand;
+    },
+
+    /**
+     * Dalle de béton : gris moucheté, joints de dilatation tous les
+     * jointEvery pixels, bord légèrement plus sombre.
+     */
+    concreteCourt: function (w, h, jointEvery) {
+      if (cache.concrete) return cache.concrete;
+      var c = canvas(w, h), ctx = c.getContext('2d');
+      var r = rng(91);
+      ctx.fillStyle = '#A6A39B';
+      ctx.fillRect(0, 0, w, h);
+      // marbrures
+      for (var i = 0; i < 90; i++) {
+        ctx.globalAlpha = 0.05 + r() * 0.07;
+        ctx.fillStyle = r() > 0.5 ? '#8C8981' : '#BDBAB1';
+        ctx.beginPath();
+        ctx.ellipse(r() * w, r() * h, 30 + r() * 120, 20 + r() * 80, r() * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // granulats
+      var tones = ['#7A776F', '#C9C6BD', '#8F8B82', '#B3AFA6', '#5F5C55'];
+      for (var k = 0; k < 45000; k++) {
+        ctx.globalAlpha = 0.2 + r() * 0.45;
+        ctx.fillStyle = tones[(r() * tones.length) | 0];
+        ctx.fillRect(r() * w, r() * h, 1 + r() * 1.4, 1 + r() * 1.4);
+      }
+      // quelques fissures fines
+      ctx.strokeStyle = '#55524C';
+      for (var f = 0; f < 6; f++) {
+        ctx.globalAlpha = 0.35;
+        ctx.lineWidth = 1;
+        var x = r() * w, y = r() * h;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (var s = 0; s < 8; s++) { x += (r() - 0.5) * 40; y += (r() - 0.3) * 30; ctx.lineTo(x, y); }
+        ctx.stroke();
+      }
+      // joints de dilatation
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = '#4E4B46';
+      for (var jy = jointEvery; jy < h - 4; jy += jointEvery) ctx.fillRect(0, Math.round(jy) - 2, w, 4);
+      ctx.fillRect(Math.round(w / 2) - 2, 0, 4, h);
+      // bord de la dalle
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#5E5B55';
+      ctx.lineWidth = 10;
+      ctx.strokeRect(5, 5, w - 10, h - 10);
+      ctx.globalAlpha = 1;
+      cache.concrete = toTexture(c);
+      return cache.concrete;
+    },
+
     /** Dégradé vertical utilisé pour le ciel. */
     skyGradient: function (stops) {
       var c = canvas(4, 512), ctx = c.getContext('2d');

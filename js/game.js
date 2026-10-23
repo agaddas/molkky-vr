@@ -16,6 +16,7 @@
   var PAL = C.palette;
   var P = C.pin;
   var PREF_KEY = 'molkky-vr.difficulty';
+  var TERRAIN_KEY = 'molkky-vr.terrain';
 
   function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
   function now() { return performance.now(); }
@@ -26,18 +27,19 @@
     });
   }
 
-  function loadPref() {
-    try { var v = localStorage.getItem(PREF_KEY); return C.difficulties[v] ? v : null; } catch (e) { return null; }
+  function loadPref(key, choices) {
+    try { var v = localStorage.getItem(key); return choices[v] ? v : null; } catch (e) { return null; }
   }
-  function savePref(v) {
-    try { localStorage.setItem(PREF_KEY, v); } catch (e) { /* rien */ }
+  function savePref(key, v) {
+    try { localStorage.setItem(key, v); } catch (e) { /* rien */ }
   }
 
   AFRAME.registerSystem('mk-game', {
     init: function () {
       var self = this;
       this.phase = 'boot';
-      this.difficulty = loadPref() || C.defaultDifficulty;
+      this.difficulty = loadPref(PREF_KEY, C.difficulties) || C.defaultDifficulty;
+      this.terrain = loadPref(TERRAIN_KEY, C.terrains) || C.defaultTerrain;
       this.game = null;
       this.lastRecord = null;
       this.pins = [];
@@ -88,6 +90,7 @@
         self.assist = scene.components['mk-assist'];
         MK.UI.init(scene);
         self.phys.onImpact(self.onImpact.bind(self));
+        self.applyTerrain();
         self.showMenu();
         document.body.classList.add('mk-ready');
         scene.emit('mk-ready');
@@ -107,6 +110,13 @@
     },
 
     diff: function () { return C.difficulties[this.difficulty]; },
+
+    /** Physique et décor du terrain choisi. */
+    applyTerrain: function () {
+      this.phys.setTerrain(C.terrains[this.terrain]);
+      MK.showTerrain(this.terrain);
+      MK.Debug.set('terrain', this.terrain);
+    },
 
     later: function (ms, fn) {
       var self = this;
@@ -129,7 +139,7 @@
     },
 
     emitState: function () {
-      this.sceneEl.emit('mk-state', { phase: this.phase, difficulty: this.difficulty, game: this.game });
+      this.sceneEl.emit('mk-state', { phase: this.phase, difficulty: this.difficulty, terrain: this.terrain, game: this.game });
     },
 
     playerPos: function () {
@@ -207,7 +217,7 @@
       this.flight = null;
       this.molkky.toStand();
       this.layoutPins();
-      MK.UI.showMenu(this.difficulty, MK.Storage.getBest(this.difficulty), this.isVR());
+      MK.UI.showMenu(this.difficulty, this.terrain, MK.Storage.getBest(this.difficulty), this.isVR());
       this.emitState();
     },
 
@@ -215,7 +225,7 @@
     startGame: function (difficulty) {
       if (difficulty && C.difficulties[difficulty]) {
         this.difficulty = difficulty;
-        savePref(difficulty);
+        savePref(PREF_KEY, difficulty);
       }
       this.cancelTimers();
       this.releaseHands();
@@ -240,8 +250,15 @@
         case 'difficulty':
           if (!C.difficulties[d.value]) return;
           this.difficulty = d.value;
-          savePref(d.value);
+          savePref(PREF_KEY, d.value);
           if (this.phase === 'menu') this.showMenu();
+          break;
+        case 'terrain':
+          if (!C.terrains[d.value] || this.phase !== 'menu') return;
+          this.terrain = d.value;
+          savePref(TERRAIN_KEY, d.value);
+          this.applyTerrain();
+          this.showMenu();
           break;
         case 'start': this.startGame(this.difficulty); break;
         case 'restart': this.startGame(this.difficulty); break;
@@ -442,6 +459,7 @@
       if (!g) return;
       MK.UI.updateScore({
         difficulty: this.difficulty,
+        terrain: this.terrain,
         score: g.score,
         throwNumber: g.status === 'playing' ? g.throwCount + 1 : g.throwCount,
         lastPoints: this.lastRecord ? this.lastRecord.points : null,
@@ -455,7 +473,7 @@
     endGame: function () {
       var self = this;
       this.phase = 'ended';
-      var summary = MK.Rules.summarize(this.game);
+      var summary = Object.assign(MK.Rules.summarize(this.game), { terrain: this.terrain });
       var store = MK.Storage.recordGame(summary);
       var win = this.game.result === 'win';
       this.audio.play(win ? 'win' : 'lose', this.pinsCenter().setY(1.2), 1);
@@ -492,6 +510,11 @@
       else if (a === 'pin' && b === 'pin') name = 'clack';
       else if (a === 'molkky' && b === 'ground') name = 'thud';
       else if (a === 'pin' && b === 'ground') { name = 'thud'; rate = 1.7; vol *= 0.7; }
+      if (name === 'thud') {
+        var snd = C.terrains[this.terrain].sound;
+        vol = Math.min(1, vol * snd.volume);
+        rate *= snd.rate;
+      }
       if (name) this.audio.play(name, pos, vol, rate * (0.94 + Math.random() * 0.12));
     },
 
